@@ -1,0 +1,115 @@
+version: "3.5"
+
+networks:
+  frontend:
+  backend:
+
+volumes:
+  account_volume_db:
+  inventory_volume_db:
+  shipping_volume_db:
+
+services:
+
+  api_gateway:
+    image: traefik:v1.6-alpine
+    volumes:
+      - ./api_gateway/traefik.toml:/etc/traefik/traefik.toml
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 80:80
+    networks:
+      - frontend
+
+  storefront_webapp:
+    build:
+      context: ./storefront_webapp
+    volumes:
+      - ./storefront_webapp/public:/var/www/html
+    labels:
+      traefik.enable: 'true'
+      traefik.frontend.rule: 'Host:store.buzzwoo.de'
+      traefik.docker.network: 'demo_frontend'
+      traefik.port: '80'
+    networks:
+      - frontend
+
+  account_service:
+    build: 
+      context: ./account_service
+    volumes:
+      - ./account_service:/var/www
+    environment:
+      DB_HOST: account_db
+      DB_DATABASE: account_db
+      DB_USERNAME: root
+      DB_PASSWORD: buzzwoo
+      DB_CONNECTION: mysql
+    labels:
+      traefik.enable: 'true'
+      traefik.frontend.rule: 'Host:account.buzzwoo.de'
+      traefik.docker.network: 'demo_frontend'
+      traefik.port: '80'
+    networks:
+      - frontend
+      - backend
+
+  inventory_service:
+    image: wordpress:4.9-php7.2-apache
+    environment:
+      WORDPRESS_DB_HOST: inventory_db
+      WORDPRESS_DB_NAME: inventory_db
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: buzzwoo
+    labels:
+      traefik.enable: 'true'
+      traefik.frontend.rule: 'Host:inventory.buzzwoo.de'
+      traefik.docker.network: 'demo_frontend'
+      traefik.port: '80'
+    restart: always
+    networks:
+      - frontend
+      - backend
+
+  shipping_service:
+    image: drupal:8.5-apache
+    labels:
+      traefik.enable: 'true'
+      traefik.frontend.rule: 'Host:shipping.buzzwoo.de'
+      traefik.docker.network: 'demo_frontend'
+      traefik.port: '80'
+    restart: always
+    networks:
+      - frontend
+      - backend
+
+  account_db:
+    image: mysql:5.7
+    environment:
+      - MYSQL_DATABASE=account_db
+      - MYSQL_ROOT_PASSWORD=buzzwoo
+    networks:
+      - backend
+    volumes:
+      - account_volume_db:/var/lib/mysql
+
+  inventory_db:
+    image: mysql:5.7
+    environment:
+      - MYSQL_DATABASE=inventory_db
+      - MYSQL_ROOT_PASSWORD=buzzwoo
+    networks:
+      - backend
+    volumes:
+      - inventory_volume_db:/var/lib/mysql
+
+  shipping_db:
+    image: mysql:5.7
+    environment:
+      - MYSQL_DATABASE=shipping_db
+      - MYSQL_ROOT_PASSWORD=buzzwoo
+    networks:
+      - backend
+    volumes:
+      - shipping_volume_db:/var/lib/mysql
+
